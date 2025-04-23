@@ -1,11 +1,9 @@
 package qmpmanager
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"sync"
 	"syscall"
 	"time"
@@ -14,17 +12,21 @@ import (
 )
 
 const maxEpollEvents = 32
+const qmpReadBufferSize = 4096
+
+type QMPEventHandler interface {
+	OnQMPEvent(vmID, event string, data map[string]interface{})
+}
 
 type QMPManager struct {
+	mu           sync.Mutex
 	cmdResponses map[string]chan map[string]interface{}
-	mutex        sync.Mutex
-	ln_mutex     map[string]*sync.Mutex
-	sockets      map[string]net.Conn
-	fdToLinode   map[int]string
-	linodeToFd   map[string]int
+	vmToFD       map[string]int
+	fdToVM       map[int]string
 	epfd         int
 	events       [maxEpollEvents]syscall.EpollEvent
 	handler      QMPEventHandler
+	bufPool      sync.Pool
 }
 
 var (
@@ -32,18 +34,10 @@ var (
 	once    sync.Once
 )
 
-type QMPEventHandler interface {
-	OnQMPEvent(vmID, event string, data map[string]interface{})
-}
-
-func (qmp *QMPManager) SetHandler(handler QMPEventHandler) {
-	qmp.handler = handler
-}
-
 func GetManager() *QMPManager {
 	once.Do(func() {
 		manager = newQMPManager()
-		go manager.StartSocketLoop()
+		go manager.eventLoop()
 	})
 	return manager
 }
@@ -53,45 +47,118 @@ func newQMPManager() *QMPManager {
 	if err != nil {
 		log.Fatalf("epoll_create1 failed: %v", err)
 	}
+
 	return &QMPManager{
 		cmdResponses: make(map[string]chan map[string]interface{}),
-		ln_mutex:     make(map[string]*sync.Mutex),
-		sockets:      make(map[string]net.Conn),
-		fdToLinode:   make(map[int]string),
-		linodeToFd:   make(map[string]int),
+		vmToFD:       make(map[string]int),
+		fdToVM:       make(map[int]string),
 		epfd:         epfd,
+		bufPool: sync.Pool{
+			New: func() interface{} {
+				b := make([]byte, qmpReadBufferSize)
+				return &b
+			},
+		},
 	}
 }
 
-func sendDataQMP(conn net.Conn, cmd map[string]interface{}) error {
-	data, err := json.Marshal(cmd)
+func (m *QMPManager) SetHandler(handler QMPEventHandler) {
+	m.handler = handler
+}
+
+func (m *QMPManager) AddVM(vmID string) error {
+	socketPath := fmt.Sprintf("/linodes/%s/run/qemu.monitor", vmID)
+
+	fd, err := syscall.Socket(syscall.AF_UNIX, syscall.SOCK_STREAM, 0)
 	if err != nil {
-		return err
+		return fmt.Errorf("socket creation failed: %w", err)
 	}
-	data = append(data, '\n')
-	_, err = conn.Write(data)
-	return err
+	addr := &syscall.SockaddrUnix{Name: socketPath}
+	if err := syscall.Connect(fd, addr); err != nil {
+		syscall.Close(fd)
+		return fmt.Errorf("connect failed: %w", err)
+	}
+
+	// Read QMP greeting
+	greeting, err := readQMPLine(fd)
+	if err != nil {
+		syscall.Close(fd)
+		return fmt.Errorf("greeting read failed: %w", err)
+	}
+	var msg map[string]interface{}
+	if err := json.Unmarshal(greeting, &msg); err != nil {
+		syscall.Close(fd)
+		return fmt.Errorf("invalid QMP greeting: %w", err)
+	}
+
+	// Send qmp_capabilities
+	capCmd := map[string]interface{}{
+		"execute": "qmp_capabilities",
+	}
+	if err := writeQMPMapCommand(fd, capCmd); err != nil {
+		syscall.Close(fd)
+		return fmt.Errorf("sending capabilities failed: %w", err)
+	}
+	capResp, err := readQMPLine(fd)
+	if err != nil || !jsonContainsReturn(capResp) {
+		syscall.Close(fd)
+		return fmt.Errorf("capabilities response invalid or missing: %s", capResp)
+	}
+
+	// Register FD to epoll
+	event := syscall.EpollEvent{Events: syscall.EPOLLIN, Fd: int32(fd)}
+	if err := syscall.EpollCtl(m.epfd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
+		syscall.Close(fd)
+		return fmt.Errorf("epoll_ctl add failed: %w", err)
+	}
+
+	m.mu.Lock()
+	m.vmToFD[vmID] = fd
+	m.fdToVM[fd] = vmID
+	m.mu.Unlock()
+
+	log.Printf("[QMP] VM %s connected and registered (fd=%d)", vmID, fd)
+	return nil
 }
 
-func (qm *QMPManager) SendCommand(linodeID string, cmd map[string]interface{}) (map[string]interface{}, error) {
-	qm.mutex.Lock()
-	conn, ok := qm.sockets[linodeID]
-	qm.mutex.Unlock()
-
+func (m *QMPManager) RemoveVM(vmID string) {
+	m.mu.Lock()
+	fd, ok := m.vmToFD[vmID]
 	if !ok {
-		return nil, fmt.Errorf("no socket for linode %s", linodeID)
+		m.mu.Unlock()
+		log.Printf("[QMP] RemoveVM: VM %s not found", vmID)
+		return
+	}
+	delete(m.vmToFD, vmID)
+	delete(m.fdToVM, fd)
+	m.mu.Unlock()
+
+	syscall.EpollCtl(m.epfd, syscall.EPOLL_CTL_DEL, fd, nil)
+	syscall.Close(fd)
+
+	log.Printf("[QMP] VM %s removed and socket closed", vmID)
+}
+
+func (m *QMPManager) SendCommand(vmID string, cmd map[string]interface{}) (map[string]interface{}, error) {
+	m.mu.Lock()
+	fd, ok := m.vmToFD[vmID]
+	m.mu.Unlock()
+	if !ok {
+		return nil, fmt.Errorf("VM %s not found", vmID)
 	}
 
 	id := uuid.New().String()
 	cmd["id"] = id
 	ch := make(chan map[string]interface{}, 1)
 
-	qm.mutex.Lock()
-	qm.cmdResponses[id] = ch
-	qm.mutex.Unlock()
+	m.mu.Lock()
+	m.cmdResponses[id] = ch
+	m.mu.Unlock()
 
-	if err := sendDataQMP(conn, cmd); err != nil {
-		return nil, err
+	data, _ := json.Marshal(cmd)
+	data = append(data, '\n')
+	if _, err := syscall.Write(fd, data); err != nil {
+		return nil, fmt.Errorf("write failed: %w", err)
 	}
 
 	select {
@@ -102,139 +169,110 @@ func (qm *QMPManager) SendCommand(linodeID string, cmd map[string]interface{}) (
 	}
 }
 
-func (qm *QMPManager) AddVM(linodeID string) error {
-	qm.ln_mutex[linodeID] = &sync.Mutex{}
-	qm.ln_mutex[linodeID].Lock()
-	path := fmt.Sprintf("/linodes/%s/run/qemu.monitor", linodeID)
-
-	conn, err := net.Dial("unix", path)
-	if err != nil {
-		return fmt.Errorf("connect failed: %v", err)
-	}
-
-	unixConn, ok := conn.(*net.UnixConn)
-	if !ok {
-		conn.Close()
-		return fmt.Errorf("failed to cast to *net.UnixConn")
-	}
-
-	reader := bufio.NewReader(conn)
-	line, err := reader.ReadBytes('\n')
-	if err != nil {
-		conn.Close()
-		return fmt.Errorf("greeting read failed: %v", err)
-	}
-
-	var greeting map[string]interface{}
-	if err := json.Unmarshal(line, &greeting); err != nil {
-		conn.Close()
-		return fmt.Errorf("invalid greeting: %v", err)
-	}
-
-	cmd := map[string]interface{}{
-		"execute": "qmp_capabilities",
-		"id":      uuid.New().String(),
-	}
-	if err := sendDataQMP(conn, cmd); err != nil {
-		conn.Close()
-		return err
-	}
-
-	line, err = reader.ReadBytes('\n')
-	if err != nil {
-		conn.Close()
-		return fmt.Errorf("capabilities response read failed: %v", err)
-	}
-	var resp map[string]interface{}
-	if err := json.Unmarshal(line, &resp); err != nil {
-		conn.Close()
-		return fmt.Errorf("invalid capabilities response: %v", err)
-	}
-	if _, ok := resp["return"]; !ok {
-		conn.Close()
-		return fmt.Errorf("capabilities failed: %v", resp)
-	}
-
-	file, err := unixConn.File()
-	if err != nil {
-		conn.Close()
-		return fmt.Errorf("fd extraction failed: %v", err)
-	}
-	fd := int(file.Fd())
-	defer file.Close()
-
-	event := syscall.EpollEvent{Events: syscall.EPOLLIN, Fd: int32(fd)}
-	if err := syscall.EpollCtl(qm.epfd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
-		conn.Close()
-		return fmt.Errorf("epoll_ctl error: %v", err)
-	}
-
-	qm.sockets[linodeID] = conn
-	qm.fdToLinode[fd] = linodeID
-	qm.linodeToFd[linodeID] = fd
-
-	fmt.Printf("VM %s is added to QMP Manager\n", linodeID)
-	qm.ln_mutex[linodeID].Unlock()
-
-	return nil
-}
-
-func (qm *QMPManager) RemoveVM(linodeID string) {
-	qm.ln_mutex[linodeID].Lock()
-	if conn, ok := qm.sockets[linodeID]; ok {
-		fd := qm.linodeToFd[linodeID]
-		syscall.EpollCtl(qm.epfd, syscall.EPOLL_CTL_DEL, fd, nil)
-		conn.Close()
-		delete(qm.sockets, linodeID)
-		delete(qm.fdToLinode, fd)
-		delete(qm.linodeToFd, linodeID)
-		qm.handler.OnQMPEvent(linodeID, "QMPSOCKREMOVE", nil)
-	}
-	fmt.Printf("VM %s is removed from QMP Manager\n", linodeID)
-	qm.ln_mutex[linodeID].Unlock()
-	delete(qm.ln_mutex, linodeID)
-}
-
-func (qm *QMPManager) handleMessage(linodeID string, msg map[string]interface{}) {
-	if id, ok := msg["id"].(string); ok {
-		if ch, exists := qm.cmdResponses[id]; exists {
-			ch <- msg
-			delete(qm.cmdResponses, id)
-		}
-	} else if event, ok := msg["event"].(string); ok {
-		qm.handler.OnQMPEvent(linodeID, event, msg)
-	}
-}
-
-func (qm *QMPManager) StartSocketLoop() {
+func (m *QMPManager) eventLoop() {
 	for {
-		nevents, err := syscall.EpollWait(qm.epfd, qm.events[:], -1)
+		n, err := syscall.EpollWait(m.epfd, m.events[:], -1)
 		if err != nil {
 			log.Printf("epoll_wait error: %v", err)
 			continue
 		}
-		for i := 0; i < nevents; i++ {
-			fd := int(qm.events[i].Fd)
 
-			linodeID := qm.fdToLinode[fd]
-			conn := qm.sockets[linodeID]
+		for i := range n {
+			fd := int(m.events[i].Fd)
 
-			qm.ln_mutex[linodeID].Lock()
-			reader := bufio.NewReader(conn)
-			line, err := reader.ReadBytes('\n')
-			qm.ln_mutex[linodeID].Unlock()
-			if err != nil {
-				log.Printf("read error (%s): %v", linodeID, err)
-				qm.RemoveVM(linodeID)
+			m.mu.Lock()
+			vmID, ok := m.fdToVM[fd]
+			m.mu.Unlock()
+			if !ok {
+				continue
+			}
+
+			bufPtr := m.bufPool.Get().(*[]byte)
+			buf := *bufPtr
+			n, err := syscall.Read(fd, buf)
+			if err != nil || n <= 0 {
+				log.Printf("[QMP] read error on %s: %v", vmID, err)
+				m.RemoveVM(vmID)
+				if m.handler != nil {
+					go m.handler.OnQMPEvent(vmID, "QMP_SOCKET_CLOSED", nil)
+				}
+				m.bufPool.Put(bufPtr)
 				continue
 			}
 
 			var msg map[string]interface{}
-			if err := json.Unmarshal(line, &msg); err != nil {
-				log.Printf("invalid JSON (%s): %v\n", linodeID, err)
+			if err := json.Unmarshal(buf[:n], &msg); err != nil {
+				log.Printf("[QMP] invalid message on %s: %v", vmID, err)
+				m.bufPool.Put(bufPtr)
 				continue
 			}
-			qm.handleMessage(linodeID, msg)
+			m.bufPool.Put(bufPtr)
+
+			m.dispatchRawMessage(vmID, msg)
 		}
 	}
+}
+
+func (m *QMPManager) dispatchRawMessage(vmID string, msg map[string]interface{}) {
+	if idVal, ok := msg["id"]; ok {
+		id := fmt.Sprintf("%v", idVal)
+
+		m.mu.Lock()
+		ch, found := m.cmdResponses[id]
+		if found {
+			ch <- msg
+			delete(m.cmdResponses, id)
+		}
+		m.mu.Unlock()
+		return
+	}
+
+	if event, ok := msg["event"].(string); ok {
+		if event == "SHUTDOWN" {
+			m.RemoveVM(vmID)
+		}
+		data := map[string]interface{}{}
+		if d, ok := msg["data"].(map[string]interface{}); ok {
+			data = d
+		}
+		if m.handler != nil {
+			go m.handler.OnQMPEvent(vmID, event, data)
+		}
+	}
+}
+
+func writeQMPMapCommand(fd int, cmd map[string]interface{}) error {
+	data, err := json.Marshal(cmd)
+	if err != nil {
+		return err
+	}
+	data = append(data, '\n')
+	_, err = syscall.Write(fd, data)
+	return err
+}
+
+func readQMPLine(fd int) ([]byte, error) {
+	var data []byte
+	buf := make([]byte, 1024)
+
+	for {
+		n, err := syscall.Read(fd, buf)
+		if err != nil {
+			return nil, err
+		}
+		data = append(data, buf[:n]...)
+		if n > 0 && buf[n-1] == '\n' {
+			break
+		}
+	}
+	return data, nil
+}
+
+func jsonContainsReturn(data []byte) bool {
+	var result map[string]interface{}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return false
+	}
+	_, ok := result["return"]
+	return ok
 }

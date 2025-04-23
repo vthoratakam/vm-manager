@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package grpcapi;
+
+option go_package = "govbin/grpcapi;grpcapi";
+
+import "google/protobuf/struct.proto";
+
+service VMManager {
+  rpc CreateVM(VMRequest) returns (VMResponse);
+  rpc StartVM(VMRequest) returns (VMResponse);
+  rpc StopVM(VMRequest) returns (VMResponse);
+  rpc GetVMStatus(VMRequest) returns (VMStatus);
+  rpc SendQMPCommand(QMPCommandRequest) returns (QMPCommandResponse);
+}
+
+// Existing messages
+message VMRequest {
+  string vm_id = 1;
+}
+
+message VMResponse {
+  string message = 1;
+  bool success = 2;
+}
+
+message VMStatus {
+  string vm_id = 1;
+  string state = 2;
+}
+
+message QMPCommandRequest {
+  string vm_id = 1;
+  google.protobuf.Struct command = 2;
+}
+
+message QMPCommandResponse {
+  bool success = 1;
+  google.protobuf.Struct command = 2;
+}
