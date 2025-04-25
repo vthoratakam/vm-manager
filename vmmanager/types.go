@@ -13,6 +13,7 @@ const (
 	StateRunning VMState = "running"
 	StateStopped VMState = "stopped"
 	StateCrashed VMState = "crashed"
+	StatePaused  VMState = "paused"
 	StateRespawn VMState = "respawn"
 )
 

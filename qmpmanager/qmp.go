@@ -173,25 +173,34 @@ func (m *QMPManager) eventLoop() {
 	for {
 		n, err := syscall.EpollWait(m.epfd, m.events[:], -1)
 		if err != nil {
-			log.Printf("epoll_wait error: %v", err)
+			log.Printf("[QMP] epoll_wait error: %v", err)
 			continue
 		}
 
 		for i := range n {
 			fd := int(m.events[i].Fd)
+			ev := m.events[i].Events
 
 			m.mu.Lock()
 			vmID, ok := m.fdToVM[fd]
 			m.mu.Unlock()
+
 			if !ok {
+				log.Printf("[QMP] event received for unknown fd: %d", fd)
 				continue
+			}
+
+			if ev&(syscall.EPOLLERR|syscall.EPOLLHUP) != 0 {
+				// Do not remove the VM just yet — read() might still return buffered messages.
+				log.Printf("[QMP] EPOLLERR | EPOLLHUP on VM %s (fd=%d), checking socket...", vmID, fd)
 			}
 
 			bufPtr := m.bufPool.Get().(*[]byte)
 			buf := *bufPtr
 			n, err := syscall.Read(fd, buf)
 			if err != nil || n <= 0 {
-				log.Printf("[QMP] read error on %s: %v", vmID, err)
+				log.Printf("[QMP] read error or socket closed on VM %s: %v", vmID, err)
+
 				m.RemoveVM(vmID)
 				if m.handler != nil {
 					go m.handler.OnQMPEvent(vmID, "QMP_SOCKET_CLOSED", nil)
@@ -202,12 +211,12 @@ func (m *QMPManager) eventLoop() {
 
 			var msg map[string]interface{}
 			if err := json.Unmarshal(buf[:n], &msg); err != nil {
-				log.Printf("[QMP] invalid message on %s: %v", vmID, err)
+				log.Printf("[QMP] invalid JSON from VM %s: %v", vmID, err)
 				m.bufPool.Put(bufPtr)
 				continue
 			}
-			m.bufPool.Put(bufPtr)
 
+			m.bufPool.Put(bufPtr)
 			m.dispatchRawMessage(vmID, msg)
 		}
 	}
