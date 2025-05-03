@@ -19,22 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	VMManager_CreateVM_FullMethodName       = "/grpcapi.VMManager/CreateVM"
-	VMManager_StartVM_FullMethodName        = "/grpcapi.VMManager/StartVM"
-	VMManager_StopVM_FullMethodName         = "/grpcapi.VMManager/StopVM"
-	VMManager_GetVMStatus_FullMethodName    = "/grpcapi.VMManager/GetVMStatus"
-	VMManager_SendQMPCommand_FullMethodName = "/grpcapi.VMManager/SendQMPCommand"
+	VMManager_HandleControlEvents_FullMethodName = "/grpcapi.VMManager/HandleControlEvents"
 )
 
 // VMManagerClient is the client API for VMManager service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type VMManagerClient interface {
-	CreateVM(ctx context.Context, in *VMRequest, opts ...grpc.CallOption) (*VMResponse, error)
-	StartVM(ctx context.Context, in *VMRequest, opts ...grpc.CallOption) (*VMResponse, error)
-	StopVM(ctx context.Context, in *VMRequest, opts ...grpc.CallOption) (*VMResponse, error)
-	GetVMStatus(ctx context.Context, in *VMRequest, opts ...grpc.CallOption) (*VMStatus, error)
-	SendQMPCommand(ctx context.Context, in *QMPCommandRequest, opts ...grpc.CallOption) (*QMPCommandResponse, error)
+	HandleControlEvents(ctx context.Context, in *VMRequest, opts ...grpc.CallOption) (*VMResponse, error)
 }
 
 type vMManagerClient struct {
@@ -45,50 +37,10 @@ func NewVMManagerClient(cc grpc.ClientConnInterface) VMManagerClient {
 	return &vMManagerClient{cc}
 }
 
-func (c *vMManagerClient) CreateVM(ctx context.Context, in *VMRequest, opts ...grpc.CallOption) (*VMResponse, error) {
+func (c *vMManagerClient) HandleControlEvents(ctx context.Context, in *VMRequest, opts ...grpc.CallOption) (*VMResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(VMResponse)
-	err := c.cc.Invoke(ctx, VMManager_CreateVM_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *vMManagerClient) StartVM(ctx context.Context, in *VMRequest, opts ...grpc.CallOption) (*VMResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(VMResponse)
-	err := c.cc.Invoke(ctx, VMManager_StartVM_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *vMManagerClient) StopVM(ctx context.Context, in *VMRequest, opts ...grpc.CallOption) (*VMResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(VMResponse)
-	err := c.cc.Invoke(ctx, VMManager_StopVM_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *vMManagerClient) GetVMStatus(ctx context.Context, in *VMRequest, opts ...grpc.CallOption) (*VMStatus, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(VMStatus)
-	err := c.cc.Invoke(ctx, VMManager_GetVMStatus_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *vMManagerClient) SendQMPCommand(ctx context.Context, in *QMPCommandRequest, opts ...grpc.CallOption) (*QMPCommandResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(QMPCommandResponse)
-	err := c.cc.Invoke(ctx, VMManager_SendQMPCommand_FullMethodName, in, out, cOpts...)
+	err := c.cc.Invoke(ctx, VMManager_HandleControlEvents_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -99,11 +51,7 @@ func (c *vMManagerClient) SendQMPCommand(ctx context.Context, in *QMPCommandRequ
 // All implementations must embed UnimplementedVMManagerServer
 // for forward compatibility.
 type VMManagerServer interface {
-	CreateVM(context.Context, *VMRequest) (*VMResponse, error)
-	StartVM(context.Context, *VMRequest) (*VMResponse, error)
-	StopVM(context.Context, *VMRequest) (*VMResponse, error)
-	GetVMStatus(context.Context, *VMRequest) (*VMStatus, error)
-	SendQMPCommand(context.Context, *QMPCommandRequest) (*QMPCommandResponse, error)
+	HandleControlEvents(context.Context, *VMRequest) (*VMResponse, error)
 	mustEmbedUnimplementedVMManagerServer()
 }
 
@@ -114,20 +62,8 @@ type VMManagerServer interface {
 // pointer dereference when methods are called.
 type UnimplementedVMManagerServer struct{}
 
-func (UnimplementedVMManagerServer) CreateVM(context.Context, *VMRequest) (*VMResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CreateVM not implemented")
-}
-func (UnimplementedVMManagerServer) StartVM(context.Context, *VMRequest) (*VMResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StartVM not implemented")
-}
-func (UnimplementedVMManagerServer) StopVM(context.Context, *VMRequest) (*VMResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method StopVM not implemented")
-}
-func (UnimplementedVMManagerServer) GetVMStatus(context.Context, *VMRequest) (*VMStatus, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetVMStatus not implemented")
-}
-func (UnimplementedVMManagerServer) SendQMPCommand(context.Context, *QMPCommandRequest) (*QMPCommandResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method SendQMPCommand not implemented")
+func (UnimplementedVMManagerServer) HandleControlEvents(context.Context, *VMRequest) (*VMResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HandleControlEvents not implemented")
 }
 func (UnimplementedVMManagerServer) mustEmbedUnimplementedVMManagerServer() {}
 func (UnimplementedVMManagerServer) testEmbeddedByValue()                   {}
@@ -150,92 +86,20 @@ func RegisterVMManagerServer(s grpc.ServiceRegistrar, srv VMManagerServer) {
 	s.RegisterService(&VMManager_ServiceDesc, srv)
 }
 
-func _VMManager_CreateVM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _VMManager_HandleControlEvents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(VMRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(VMManagerServer).CreateVM(ctx, in)
+		return srv.(VMManagerServer).HandleControlEvents(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: VMManager_CreateVM_FullMethodName,
+		FullMethod: VMManager_HandleControlEvents_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMManagerServer).CreateVM(ctx, req.(*VMRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _VMManager_StartVM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(VMRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMManagerServer).StartVM(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: VMManager_StartVM_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMManagerServer).StartVM(ctx, req.(*VMRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _VMManager_StopVM_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(VMRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMManagerServer).StopVM(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: VMManager_StopVM_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMManagerServer).StopVM(ctx, req.(*VMRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _VMManager_GetVMStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(VMRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMManagerServer).GetVMStatus(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: VMManager_GetVMStatus_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMManagerServer).GetVMStatus(ctx, req.(*VMRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _VMManager_SendQMPCommand_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(QMPCommandRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(VMManagerServer).SendQMPCommand(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: VMManager_SendQMPCommand_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(VMManagerServer).SendQMPCommand(ctx, req.(*QMPCommandRequest))
+		return srv.(VMManagerServer).HandleControlEvents(ctx, req.(*VMRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -248,24 +112,8 @@ var VMManager_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*VMManagerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CreateVM",
-			Handler:    _VMManager_CreateVM_Handler,
-		},
-		{
-			MethodName: "StartVM",
-			Handler:    _VMManager_StartVM_Handler,
-		},
-		{
-			MethodName: "StopVM",
-			Handler:    _VMManager_StopVM_Handler,
-		},
-		{
-			MethodName: "GetVMStatus",
-			Handler:    _VMManager_GetVMStatus_Handler,
-		},
-		{
-			MethodName: "SendQMPCommand",
-			Handler:    _VMManager_SendQMPCommand_Handler,
+			MethodName: "HandleControlEvents",
+			Handler:    _VMManager_HandleControlEvents_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

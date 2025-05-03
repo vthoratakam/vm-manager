@@ -138,8 +138,7 @@ func (m *QMPManager) RemoveVM(vmID string) {
 
 	log.Printf("[QMP] VM %s removed and socket closed", vmID)
 }
-
-func (m *QMPManager) SendCommand(vmID string, cmd map[string]interface{}) (map[string]interface{}, error) {
+func (m *QMPManager) SendCommand(vmID string, cmd map[string]interface{}) (interface{}, error) {
 	m.mu.Lock()
 	fd, ok := m.vmToFD[vmID]
 	m.mu.Unlock()
@@ -161,9 +160,22 @@ func (m *QMPManager) SendCommand(vmID string, cmd map[string]interface{}) (map[s
 		return nil, fmt.Errorf("write failed: %w", err)
 	}
 
+	log.Printf("[VM %s] Sent QMP command: %s", vmID, string(data))
+
 	select {
 	case resp := <-ch:
-		return resp, nil
+		log.Printf("[VM %s] Sent QMP response: %+v", vmID, resp)
+
+		if errInfo, ok := resp["error"].(map[string]interface{}); ok {
+			return nil, fmt.Errorf("%v: %v", errInfo["class"], errInfo["desc"])
+		}
+
+		if result, ok := resp["return"]; ok {
+			return result, nil
+		}
+
+		return nil, fmt.Errorf("invalid response format: missing 'return'")
+
 	case <-time.After(5 * time.Second):
 		return nil, fmt.Errorf("timeout waiting for response")
 	}

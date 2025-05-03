@@ -9,6 +9,7 @@ package grpcapi
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -21,12 +22,74 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-// Existing messages
+type ControlEventType int32
+
+const (
+	ControlEventType_CONTROL_EVENT_UNKNOWN   ControlEventType = 0
+	ControlEventType_CONTROL_EVENT_CREATE_VM ControlEventType = 1
+	ControlEventType_CONTROL_EVENT_DELETE_VM ControlEventType = 2
+	ControlEventType_CONTROL_EVENT_START_VM  ControlEventType = 3
+	ControlEventType_CONTROL_EVENT_STOP_VM   ControlEventType = 4
+	ControlEventType_CONTROL_EXECUTE_QMP_CMD ControlEventType = 5
+	ControlEventType_CONTROL_GET_VM_STATUS   ControlEventType = 6
+)
+
+// Enum value maps for ControlEventType.
+var (
+	ControlEventType_name = map[int32]string{
+		0: "CONTROL_EVENT_UNKNOWN",
+		1: "CONTROL_EVENT_CREATE_VM",
+		2: "CONTROL_EVENT_DELETE_VM",
+		3: "CONTROL_EVENT_START_VM",
+		4: "CONTROL_EVENT_STOP_VM",
+		5: "CONTROL_EXECUTE_QMP_CMD",
+		6: "CONTROL_GET_VM_STATUS",
+	}
+	ControlEventType_value = map[string]int32{
+		"CONTROL_EVENT_UNKNOWN":   0,
+		"CONTROL_EVENT_CREATE_VM": 1,
+		"CONTROL_EVENT_DELETE_VM": 2,
+		"CONTROL_EVENT_START_VM":  3,
+		"CONTROL_EVENT_STOP_VM":   4,
+		"CONTROL_EXECUTE_QMP_CMD": 5,
+		"CONTROL_GET_VM_STATUS":   6,
+	}
+)
+
+func (x ControlEventType) Enum() *ControlEventType {
+	p := new(ControlEventType)
+	*p = x
+	return p
+}
+
+func (x ControlEventType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ControlEventType) Descriptor() protoreflect.EnumDescriptor {
+	return file_grpcapi_vmmanager_proto_enumTypes[0].Descriptor()
+}
+
+func (ControlEventType) Type() protoreflect.EnumType {
+	return &file_grpcapi_vmmanager_proto_enumTypes[0]
+}
+
+func (x ControlEventType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ControlEventType.Descriptor instead.
+func (ControlEventType) EnumDescriptor() ([]byte, []int) {
+	return file_grpcapi_vmmanager_proto_rawDescGZIP(), []int{0}
+}
+
 type VMRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	VmId          string                 `protobuf:"bytes,1,opt,name=vm_id,json=vmId,proto3" json:"vm_id,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	VmId           string                 `protobuf:"bytes,1,opt,name=vm_id,json=vmId,proto3" json:"vm_id,omitempty"`
+	ControlEvent   ControlEventType       `protobuf:"varint,2,opt,name=control_event,json=controlEvent,proto3,enum=grpcapi.ControlEventType" json:"control_event,omitempty"`
+	ControlContext *structpb.Struct       `protobuf:"bytes,3,opt,name=control_context,json=controlContext,proto3" json:"control_context,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *VMRequest) Reset() {
@@ -66,10 +129,25 @@ func (x *VMRequest) GetVmId() string {
 	return ""
 }
 
+func (x *VMRequest) GetControlEvent() ControlEventType {
+	if x != nil {
+		return x.ControlEvent
+	}
+	return ControlEventType_CONTROL_EVENT_UNKNOWN
+}
+
+func (x *VMRequest) GetControlContext() *structpb.Struct {
+	if x != nil {
+		return x.ControlContext
+	}
+	return nil
+}
+
 type VMResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Message       string                 `protobuf:"bytes,1,opt,name=message,proto3" json:"message,omitempty"`
-	Success       bool                   `protobuf:"varint,2,opt,name=success,proto3" json:"success,omitempty"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Result        *structpb.Struct       `protobuf:"bytes,3,opt,name=result,proto3" json:"result,omitempty"` // Optional additional info
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -104,13 +182,6 @@ func (*VMResponse) Descriptor() ([]byte, []int) {
 	return file_grpcapi_vmmanager_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *VMResponse) GetMessage() string {
-	if x != nil {
-		return x.Message
-	}
-	return ""
-}
-
 func (x *VMResponse) GetSuccess() bool {
 	if x != nil {
 		return x.Success
@@ -118,158 +189,16 @@ func (x *VMResponse) GetSuccess() bool {
 	return false
 }
 
-type VMStatus struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	VmId          string                 `protobuf:"bytes,1,opt,name=vm_id,json=vmId,proto3" json:"vm_id,omitempty"`
-	State         string                 `protobuf:"bytes,2,opt,name=state,proto3" json:"state,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *VMStatus) Reset() {
-	*x = VMStatus{}
-	mi := &file_grpcapi_vmmanager_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *VMStatus) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*VMStatus) ProtoMessage() {}
-
-func (x *VMStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_grpcapi_vmmanager_proto_msgTypes[2]
+func (x *VMResponse) GetMessage() string {
 	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use VMStatus.ProtoReflect.Descriptor instead.
-func (*VMStatus) Descriptor() ([]byte, []int) {
-	return file_grpcapi_vmmanager_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *VMStatus) GetVmId() string {
-	if x != nil {
-		return x.VmId
+		return x.Message
 	}
 	return ""
 }
 
-func (x *VMStatus) GetState() string {
+func (x *VMResponse) GetResult() *structpb.Struct {
 	if x != nil {
-		return x.State
-	}
-	return ""
-}
-
-type QMPCommandRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	VmId          string                 `protobuf:"bytes,1,opt,name=vm_id,json=vmId,proto3" json:"vm_id,omitempty"`
-	Command       map[string]string      `protobuf:"bytes,2,rep,name=command,proto3" json:"command,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"` // QMP command as a key-value map
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *QMPCommandRequest) Reset() {
-	*x = QMPCommandRequest{}
-	mi := &file_grpcapi_vmmanager_proto_msgTypes[3]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *QMPCommandRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*QMPCommandRequest) ProtoMessage() {}
-
-func (x *QMPCommandRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_grpcapi_vmmanager_proto_msgTypes[3]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use QMPCommandRequest.ProtoReflect.Descriptor instead.
-func (*QMPCommandRequest) Descriptor() ([]byte, []int) {
-	return file_grpcapi_vmmanager_proto_rawDescGZIP(), []int{3}
-}
-
-func (x *QMPCommandRequest) GetVmId() string {
-	if x != nil {
-		return x.VmId
-	}
-	return ""
-}
-
-func (x *QMPCommandRequest) GetCommand() map[string]string {
-	if x != nil {
-		return x.Command
-	}
-	return nil
-}
-
-type QMPCommandResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
-	Response      map[string]string      `protobuf:"bytes,3,rep,name=response,proto3" json:"response,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *QMPCommandResponse) Reset() {
-	*x = QMPCommandResponse{}
-	mi := &file_grpcapi_vmmanager_proto_msgTypes[4]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *QMPCommandResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*QMPCommandResponse) ProtoMessage() {}
-
-func (x *QMPCommandResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_grpcapi_vmmanager_proto_msgTypes[4]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use QMPCommandResponse.ProtoReflect.Descriptor instead.
-func (*QMPCommandResponse) Descriptor() ([]byte, []int) {
-	return file_grpcapi_vmmanager_proto_rawDescGZIP(), []int{4}
-}
-
-func (x *QMPCommandResponse) GetSuccess() bool {
-	if x != nil {
-		return x.Success
-	}
-	return false
-}
-
-func (x *QMPCommandResponse) GetResponse() map[string]string {
-	if x != nil {
-		return x.Response
+		return x.Result
 	}
 	return nil
 }
@@ -278,34 +207,26 @@ var File_grpcapi_vmmanager_proto protoreflect.FileDescriptor
 
 const file_grpcapi_vmmanager_proto_rawDesc = "" +
 	"\n" +
-	"\x17grpcapi/vmmanager.proto\x12\agrpcapi\" \n" +
+	"\x17grpcapi/vmmanager.proto\x12\agrpcapi\x1a\x1cgoogle/protobuf/struct.proto\"\xa2\x01\n" +
 	"\tVMRequest\x12\x13\n" +
-	"\x05vm_id\x18\x01 \x01(\tR\x04vmId\"@\n" +
+	"\x05vm_id\x18\x01 \x01(\tR\x04vmId\x12>\n" +
+	"\rcontrol_event\x18\x02 \x01(\x0e2\x19.grpcapi.ControlEventTypeR\fcontrolEvent\x12@\n" +
+	"\x0fcontrol_context\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x0econtrolContext\"q\n" +
 	"\n" +
 	"VMResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage\x12\x18\n" +
-	"\asuccess\x18\x02 \x01(\bR\asuccess\"5\n" +
-	"\bVMStatus\x12\x13\n" +
-	"\x05vm_id\x18\x01 \x01(\tR\x04vmId\x12\x14\n" +
-	"\x05state\x18\x02 \x01(\tR\x05state\"\xa7\x01\n" +
-	"\x11QMPCommandRequest\x12\x13\n" +
-	"\x05vm_id\x18\x01 \x01(\tR\x04vmId\x12A\n" +
-	"\acommand\x18\x02 \x03(\v2'.grpcapi.QMPCommandRequest.CommandEntryR\acommand\x1a:\n" +
-	"\fCommandEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xb2\x01\n" +
-	"\x12QMPCommandResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\x12E\n" +
-	"\bresponse\x18\x03 \x03(\v2).grpcapi.QMPCommandResponse.ResponseEntryR\bresponse\x1a;\n" +
-	"\rResponseEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x012\xa8\x02\n" +
-	"\tVMManager\x123\n" +
-	"\bCreateVM\x12\x12.grpcapi.VMRequest\x1a\x13.grpcapi.VMResponse\x122\n" +
-	"\aStartVM\x12\x12.grpcapi.VMRequest\x1a\x13.grpcapi.VMResponse\x121\n" +
-	"\x06StopVM\x12\x12.grpcapi.VMRequest\x1a\x13.grpcapi.VMResponse\x124\n" +
-	"\vGetVMStatus\x12\x12.grpcapi.VMRequest\x1a\x11.grpcapi.VMStatus\x12I\n" +
-	"\x0eSendQMPCommand\x12\x1a.grpcapi.QMPCommandRequest\x1a\x1b.grpcapi.QMPCommandResponseB\x18Z\x16govbin/grpcapi;grpcapib\x06proto3"
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12/\n" +
+	"\x06result\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x06result*\xd6\x01\n" +
+	"\x10ControlEventType\x12\x19\n" +
+	"\x15CONTROL_EVENT_UNKNOWN\x10\x00\x12\x1b\n" +
+	"\x17CONTROL_EVENT_CREATE_VM\x10\x01\x12\x1b\n" +
+	"\x17CONTROL_EVENT_DELETE_VM\x10\x02\x12\x1a\n" +
+	"\x16CONTROL_EVENT_START_VM\x10\x03\x12\x19\n" +
+	"\x15CONTROL_EVENT_STOP_VM\x10\x04\x12\x1b\n" +
+	"\x17CONTROL_EXECUTE_QMP_CMD\x10\x05\x12\x19\n" +
+	"\x15CONTROL_GET_VM_STATUS\x10\x062K\n" +
+	"\tVMManager\x12>\n" +
+	"\x13HandleControlEvents\x12\x12.grpcapi.VMRequest\x1a\x13.grpcapi.VMResponseB\x1bZ\x19vmmanager/grpcapi;grpcapib\x06proto3"
 
 var (
 	file_grpcapi_vmmanager_proto_rawDescOnce sync.Once
@@ -319,34 +240,25 @@ func file_grpcapi_vmmanager_proto_rawDescGZIP() []byte {
 	return file_grpcapi_vmmanager_proto_rawDescData
 }
 
-var file_grpcapi_vmmanager_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_grpcapi_vmmanager_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_grpcapi_vmmanager_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
 var file_grpcapi_vmmanager_proto_goTypes = []any{
-	(*VMRequest)(nil),          // 0: grpcapi.VMRequest
-	(*VMResponse)(nil),         // 1: grpcapi.VMResponse
-	(*VMStatus)(nil),           // 2: grpcapi.VMStatus
-	(*QMPCommandRequest)(nil),  // 3: grpcapi.QMPCommandRequest
-	(*QMPCommandResponse)(nil), // 4: grpcapi.QMPCommandResponse
-	nil,                        // 5: grpcapi.QMPCommandRequest.CommandEntry
-	nil,                        // 6: grpcapi.QMPCommandResponse.ResponseEntry
+	(ControlEventType)(0),   // 0: grpcapi.ControlEventType
+	(*VMRequest)(nil),       // 1: grpcapi.VMRequest
+	(*VMResponse)(nil),      // 2: grpcapi.VMResponse
+	(*structpb.Struct)(nil), // 3: google.protobuf.Struct
 }
 var file_grpcapi_vmmanager_proto_depIdxs = []int32{
-	5, // 0: grpcapi.QMPCommandRequest.command:type_name -> grpcapi.QMPCommandRequest.CommandEntry
-	6, // 1: grpcapi.QMPCommandResponse.response:type_name -> grpcapi.QMPCommandResponse.ResponseEntry
-	0, // 2: grpcapi.VMManager.CreateVM:input_type -> grpcapi.VMRequest
-	0, // 3: grpcapi.VMManager.StartVM:input_type -> grpcapi.VMRequest
-	0, // 4: grpcapi.VMManager.StopVM:input_type -> grpcapi.VMRequest
-	0, // 5: grpcapi.VMManager.GetVMStatus:input_type -> grpcapi.VMRequest
-	3, // 6: grpcapi.VMManager.SendQMPCommand:input_type -> grpcapi.QMPCommandRequest
-	1, // 7: grpcapi.VMManager.CreateVM:output_type -> grpcapi.VMResponse
-	1, // 8: grpcapi.VMManager.StartVM:output_type -> grpcapi.VMResponse
-	1, // 9: grpcapi.VMManager.StopVM:output_type -> grpcapi.VMResponse
-	2, // 10: grpcapi.VMManager.GetVMStatus:output_type -> grpcapi.VMStatus
-	4, // 11: grpcapi.VMManager.SendQMPCommand:output_type -> grpcapi.QMPCommandResponse
-	7, // [7:12] is the sub-list for method output_type
-	2, // [2:7] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0, // 0: grpcapi.VMRequest.control_event:type_name -> grpcapi.ControlEventType
+	3, // 1: grpcapi.VMRequest.control_context:type_name -> google.protobuf.Struct
+	3, // 2: grpcapi.VMResponse.result:type_name -> google.protobuf.Struct
+	1, // 3: grpcapi.VMManager.HandleControlEvents:input_type -> grpcapi.VMRequest
+	2, // 4: grpcapi.VMManager.HandleControlEvents:output_type -> grpcapi.VMResponse
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_grpcapi_vmmanager_proto_init() }
@@ -359,13 +271,14 @@ func file_grpcapi_vmmanager_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_grpcapi_vmmanager_proto_rawDesc), len(file_grpcapi_vmmanager_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   7,
+			NumEnums:      1,
+			NumMessages:   2,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_grpcapi_vmmanager_proto_goTypes,
 		DependencyIndexes: file_grpcapi_vmmanager_proto_depIdxs,
+		EnumInfos:         file_grpcapi_vmmanager_proto_enumTypes,
 		MessageInfos:      file_grpcapi_vmmanager_proto_msgTypes,
 	}.Build()
 	File_grpcapi_vmmanager_proto = out.File

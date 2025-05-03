@@ -111,3 +111,33 @@ my @cmd = (
 close STDERR;
 open (STDERR, '>', '/linodes/linode506948/run/qemu-stderr.log');
 exec(@cmd) or die("couldnt exec ".join(" ",@cmd).": $!");
+
+
+/*
+		scriptPath := fmt.Sprintf("/linodes/%s/create.pl", vmID)
+
+		// Set file permissions to 00750
+		err := os.Chmod(scriptPath, 0750)
+		if err != nil {
+			return fmt.Errorf("failed to chmod file: %w", err)
+		}
+
+		fmt.Println("Permissions updated successfully.")
+
+		cmd := exec.Command(
+			"su",
+			"-",
+			vmID,
+			"-s", "/bin/bash",
+			"-c",
+			"exec screen -t "+vmID+" -L -S "+vmID+" -c /vbin/screenrc -d -m sudo -- "+scriptPath,
+		)
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		if err := cmd.Start(); err != nil {
+			log.Printf("[VM %s] Failed to start VM script: %v", vmID, err)
+			return fmt.Errorf("failed to start VM script: %w", err)
+		}
+		log.Printf("[VM %s] Script started in background with PID %d", vmID, cmd.Process.Pid)
+
+	*/

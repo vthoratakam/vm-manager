@@ -6,13 +6,48 @@ import (
 	"time"
 )
 
+// CreateVM Create a VM instance from the manager
+func (v *VMManager) CreateVM(vmID string) error {
+	vm, exists := v.vmList[vmID]
+	if exists {
+		// Optionally, check VM state before deciding to start
+		log.Printf("VM %s already exists, skipping creation", vmID)
+		return fmt.Errorf("VM %s already exists", vmID)
+	}
+	// Create
+	newVM := &VMInstance{}
+	v.vmList[vmID] = newVM
+	vm.State = StateRunning
+	vm.qmpState = QMPState(QMPDisconnected)
+
+	return nil
+
+}
+
+// DeleteVM deletes a VM instance from the manager
+func (v *VMManager) DeleteVM(vmID string) error {
+	v.StopVM(vmID)
+	delete(v.vmList, vmID)
+	return nil
+}
+
+func (v *VMManager) GetStatus(vmID string) (string, error) {
+	vm, exists := v.vmList[vmID]
+	if !exists {
+		return "", fmt.Errorf("VM %s not found", vmID)
+	}
+	vm.vmMutex.Lock()
+	state := string(vm.State)
+	vm.vmMutex.Lock()
+	return state, nil
+}
+
 func (v *VMManager) StartVM(vmID string) error {
 	vm, exists := v.vmList[vmID]
 	if !exists {
 		return fmt.Errorf("VM %s not found", vmID)
 	}
 
-	// VM reboot time
 	if vm.State == StateRespawn {
 		log.Printf("[VM %s] Respawn in progress. No operation performed.", vmID)
 		return nil
@@ -47,38 +82,5 @@ func (v *VMManager) StartVM(vmID string) error {
 func (v *VMManager) StopVM(vmID string) error {
 
 	v.qmp.RemoveVM(vmID)
-	return nil
-}
-
-// ForceStopVM forcefully stops the VM (e.g., kill the process)
-func (v *VMManager) ForceStopVM(vmID string) error {
-	// Implement logic to force stop a VM
-	return nil
-}
-
-// CreateVM Create a VM instance from the manager
-func (v *VMManager) CreateVM(vmID string) error {
-	// Implement logic to Create a VM
-	v.vmList[vmID] = &VMInstance{}
-	v.StartVM(vmID)
-	return nil
-}
-
-// DeleteVM deletes a VM instance from the manager
-func (v *VMManager) DeleteVM(vmID string) error {
-	// Implement logic to remove a VM
-	return nil
-}
-
-func (v *VMManager) GetStatus(vmID string) (string, error) {
-	vm, exists := v.vmList[vmID]
-	if !exists {
-		return "", fmt.Errorf("VM %s not found", vmID)
-	}
-	return string(vm.State), nil
-}
-
-// ListVMs lists all the VMs under management and queries their status
-func (v *VMManager) ListVMs() []*VMInstance {
 	return nil
 }
