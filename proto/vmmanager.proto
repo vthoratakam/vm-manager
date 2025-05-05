@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package proto;
+option go_package = "vmmanager/proto;proto";
+
+import "google/protobuf/struct.proto";
+
+service VMManager {
+  rpc HandleControlEvents(VMRequest) returns (VMResponse);
+}
+
+enum ControlEventType {
+  CONTROL_EVENT_UNKNOWN   = 0;
+  CONTROL_EVENT_CREATE_VM = 1;
+  CONTROL_EVENT_DELETE_VM = 2;
+  CONTROL_EVENT_START_VM  = 3;
+  CONTROL_EVENT_STOP_VM   = 4;
+  CONTROL_EXECUTE_QMP_CMD = 5;
+  CONTROL_GET_VM_STATUS   = 6;
+}
+
+message VMRequest {
+  string vm_id = 1;
+  ControlEventType control_event = 2;
+  google.protobuf.Struct control_context = 3;
+}
+
+message VMResponse {
+  bool success = 1;
+  google.protobuf.Struct result = 2; // Optional additional info
+}
