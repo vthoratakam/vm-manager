@@ -26,7 +26,7 @@ func (v *VMManager) CreateVM(vmID string) error {
 
 // DeleteVM deletes a VM instance from the manager
 func (v *VMManager) DeleteVM(vmID string) error {
-	v.StopVM(vmID)
+	v.qmp.RemoveVM(vmID)
 	delete(v.vmList, vmID)
 	return nil
 }
@@ -81,6 +81,12 @@ func (v *VMManager) StartVM(vmID string) error {
 // StopVM gracefully stops the VM
 func (v *VMManager) StopVM(vmID string) error {
 
+	vm, exists := v.vmList[vmID]
+	if !exists {
+		return fmt.Errorf("VM %s not found", vmID)
+	}
+	vm.qmpState = QMPState(QMPDisconnected)
+	vm.State = StateStopped
 	v.qmp.RemoveVM(vmID)
 	return nil
 }

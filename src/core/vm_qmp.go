@@ -89,14 +89,7 @@ func (v *VMManager) SendQMPCommand(vmID string, context map[string]interface{}) 
 		return nil, fmt.Errorf("QMP not connected for VM %s", vmID)
 	}
 
-	// Ensure the command is in the context
-	cmd, ok := context["command"].(map[string]interface{})
-	if !ok {
-		log.Printf("[VM %s] Invalid 'command' in context", vmID)
-		return nil, fmt.Errorf("invalid or missing QMP command in context")
-	}
-
-	resp, err := v.qmp.SendQMPCommand(vmID, cmd)
+	resp, err := v.qmp.SendQMPCommand(vmID, context)
 
 	// Handle error from QMP/HMP command
 	if err != nil {

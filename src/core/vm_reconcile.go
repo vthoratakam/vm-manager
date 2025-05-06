@@ -41,8 +41,6 @@ func (v *VMManager) reconcileVM(vmID string, event ReconcileEvent, context map[s
 		return map[string]interface{}{"info": "VM created and started"}, nil
 
 	case QMP_EVENT_SHUTDOWN, QMP_EVENT_SOCKET_CLOSED:
-		vm.State = StateStopped
-		vm.qmpState = QMPState(QMPDisconnected)
 		v.StopVM(vmID)
 		return map[string]interface{}{"info": "VM stopped due to QMP event"}, nil
 
