@@ -30,8 +30,8 @@ const (
 type QMPState string
 
 const (
-	QMPConnected    QMPState     = "connected"
-	QMPDisconnected DesiredState = "disconnected"
+	QMPConnected    QMPState = "connected"
+	QMPDisconnected QMPState = "disconnected"
 )
 
 type ReconcileEvent int

@@ -8,7 +8,7 @@ import (
 
 // CreateVM Create a VM instance from the manager
 func (v *VMManager) CreateVM(vmID string) error {
-	vm, exists := v.vmList[vmID]
+	_, exists := v.vmList[vmID]
 	if exists {
 		// Optionally, check VM state before deciding to start
 		log.Printf("VM %s already exists, skipping creation", vmID)
@@ -17,8 +17,8 @@ func (v *VMManager) CreateVM(vmID string) error {
 	// Create
 	newVM := &VMInstance{}
 	v.vmList[vmID] = newVM
-	vm.State = StateRunning
-	vm.qmpState = QMPState(QMPDisconnected)
+	v.vmList[vmID].State = StateRunning
+	v.vmList[vmID].qmpState = QMPState(QMPDisconnected)
 
 	return nil
 
@@ -29,17 +29,6 @@ func (v *VMManager) DeleteVM(vmID string) error {
 	v.qmp.RemoveVM(vmID)
 	delete(v.vmList, vmID)
 	return nil
-}
-
-func (v *VMManager) GetStatus(vmID string) (string, error) {
-	vm, exists := v.vmList[vmID]
-	if !exists {
-		return "", fmt.Errorf("VM %s not found", vmID)
-	}
-	vm.vmMutex.Lock()
-	state := string(vm.State)
-	vm.vmMutex.Lock()
-	return state, nil
 }
 
 func (v *VMManager) StartVM(vmID string) error {
@@ -85,7 +74,7 @@ func (v *VMManager) StopVM(vmID string) error {
 	if !exists {
 		return fmt.Errorf("VM %s not found", vmID)
 	}
-	vm.qmpState = QMPState(QMPDisconnected)
+	vm.qmpState = QMPDisconnected
 	vm.State = StateStopped
 	v.qmp.RemoveVM(vmID)
 	return nil

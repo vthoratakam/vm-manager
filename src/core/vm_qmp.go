@@ -37,7 +37,7 @@ func isQemuRunning(vmID string) bool {
 func (v *VMManager) attachToQMPWithRetry(vmID string, maxRetries int, baseDelay time.Duration) error {
 
 	var err error
-	v.vmList[vmID].qmpState = QMPState(QMPDisconnected)
+	v.vmList[vmID].qmpState = QMPDisconnected
 	for i := 0; i < maxRetries; i++ {
 		err = v.qmp.AddVM(vmID)
 		if err == nil {

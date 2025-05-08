@@ -51,6 +51,8 @@ func (v *VMManager) detectExistingVMs() {
 		}
 		vmID := parts[2]
 		v.vmList[vmID] = &VMInstance{}
+		v.vmList[vmID].State = StateStopped
+		v.vmList[vmID].qmpState = QMPDisconnected
 		go v.reconcileVM(vmID, VM_MANAGER_START, nil)
 	}
 }
@@ -87,6 +89,7 @@ func buildErrorResponse(err error) (*grpcapi.VMResponse, error) {
 }
 
 func (v *VMManager) HandleEvent(vmID string, event grpcapi.ControlEventType, context map[string]interface{}) (*grpcapi.VMResponse, error) {
+
 	reconcileEvent := FromProtoEvent(event)
 
 	var rawResult map[string]interface{}
@@ -95,7 +98,13 @@ func (v *VMManager) HandleEvent(vmID string, event grpcapi.ControlEventType, con
 	if reconcileEvent == CONTROL_EVENT_EXECUTE_QMP_CMD {
 		rawResult, err = v.SendQMPCommand(vmID, context)
 	} else if reconcileEvent == CONTROL_EVENT_GET_VM_STATUS {
-		resultStruct, err := structpb.NewStruct(map[string]interface{}{"text": string(v.vmList[vmID].State)})
+		vm, exist := v.vmList[vmID]
+		if !exist {
+			return buildErrorResponse(fmt.Errorf("VM Not Found: %s", vmID))
+		}
+		status := vm.State
+		log.Printf("VM %s Status %s", vmID, status)
+		resultStruct, err := structpb.NewStruct(map[string]interface{}{"text": string(status)})
 		if err != nil {
 			return buildErrorResponse(fmt.Errorf("failed to convert result to Struct: %v", err))
 		}

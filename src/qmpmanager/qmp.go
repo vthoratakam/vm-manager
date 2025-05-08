@@ -14,10 +14,10 @@ import (
 
 const (
 	maxEpollEvents       = 32
-	qmpReadBufferSize    = 4096
+	qmpReadBufferSize    = 262144
 	maxConnectionRetries = 3
 	retryDelay           = 500 * time.Millisecond
-	commandTimeout       = 5 * time.Second
+	commandTimeout       = 10 * time.Second
 )
 
 type QMPEventHandler interface {
@@ -228,11 +228,13 @@ func (m *QMPManager) SendQMPCommand(vmID string, cmd map[string]interface{}) (in
 
 	select {
 	case resp := <-ch:
+
+		log.Printf("[VM %s] QMP response: %+v", vmID, resp)
+
 		if errInfo, ok := resp["error"].(map[string]interface{}); ok {
 			return nil, fmt.Errorf("%v: %v", errInfo["class"], errInfo["desc"])
 		}
-		if result, ok := resp["return"]; ok {
-			log.Printf("[VM %s] QMP response: %+v", vmID, result)
+		if _, ok := resp["return"]; ok {
 			return resp, nil
 		}
 		return nil, fmt.Errorf("invalid response format: missing 'return'")
