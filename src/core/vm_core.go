@@ -1,6 +1,7 @@
 package vmmanager
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -88,15 +89,22 @@ func buildErrorResponse(err error) (*grpcapi.VMResponse, error) {
 	}, nil
 }
 
-func (v *VMManager) HandleEvent(vmID string, event grpcapi.ControlEventType, context map[string]interface{}) (*grpcapi.VMResponse, error) {
+func (v *VMManager) HandleEvent(vmID string, event grpcapi.ControlEventType, context []byte) (*grpcapi.VMResponse, error) {
 
 	reconcileEvent := FromProtoEvent(event)
 
 	var rawResult map[string]interface{}
 	var err error
 
+	log.Printf("Raw context: %s", string(context))
+	var jsonContext map[string]interface{}
+	if err := json.Unmarshal(context, &jsonContext); err != nil {
+
+		return buildErrorResponse(fmt.Errorf("invalid JSON context: %s", jsonContext))
+	}
+
 	if reconcileEvent == CONTROL_EVENT_EXECUTE_QMP_CMD {
-		rawResult, err = v.SendQMPCommand(vmID, context)
+		rawResult, err = v.SendQMPCommand(vmID, jsonContext)
 	} else if reconcileEvent == CONTROL_EVENT_GET_VM_STATUS {
 		vm, exist := v.vmList[vmID]
 		if !exist {
@@ -113,7 +121,7 @@ func (v *VMManager) HandleEvent(vmID string, event grpcapi.ControlEventType, con
 			Result:  resultStruct,
 		}, nil
 	} else {
-		rawResult, err = v.reconcileVM(vmID, reconcileEvent, context)
+		rawResult, err = v.reconcileVM(vmID, reconcileEvent, jsonContext)
 	}
 
 	if err != nil {

@@ -22,7 +22,7 @@ enum ControlEventType {
 message VMRequest {
   string vm_id = 1;
   ControlEventType control_event = 2;
-  google.protobuf.Struct control_context = 3;
+  bytes control_context = 3;
 }
 
 message VMResponse {

@@ -87,7 +87,7 @@ type VMRequest struct {
 	state          protoimpl.MessageState `protogen:"open.v1"`
 	VmId           string                 `protobuf:"bytes,1,opt,name=vm_id,json=vmId,proto3" json:"vm_id,omitempty"`
 	ControlEvent   ControlEventType       `protobuf:"varint,2,opt,name=control_event,json=controlEvent,proto3,enum=proto.ControlEventType" json:"control_event,omitempty"`
-	ControlContext *structpb.Struct       `protobuf:"bytes,3,opt,name=control_context,json=controlContext,proto3" json:"control_context,omitempty"`
+	ControlContext []byte                 `protobuf:"bytes,3,opt,name=control_context,json=controlContext,proto3" json:"control_context,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -136,7 +136,7 @@ func (x *VMRequest) GetControlEvent() ControlEventType {
 	return ControlEventType_CONTROL_EVENT_UNKNOWN
 }
 
-func (x *VMRequest) GetControlContext() *structpb.Struct {
+func (x *VMRequest) GetControlContext() []byte {
 	if x != nil {
 		return x.ControlContext
 	}
@@ -199,11 +199,11 @@ var File_proto_vmmanager_proto protoreflect.FileDescriptor
 
 const file_proto_vmmanager_proto_rawDesc = "" +
 	"\n" +
-	"\x15proto/vmmanager.proto\x12\x05proto\x1a\x1cgoogle/protobuf/struct.proto\"\xa0\x01\n" +
+	"\x15proto/vmmanager.proto\x12\x05proto\x1a\x1cgoogle/protobuf/struct.proto\"\x87\x01\n" +
 	"\tVMRequest\x12\x13\n" +
 	"\x05vm_id\x18\x01 \x01(\tR\x04vmId\x12<\n" +
-	"\rcontrol_event\x18\x02 \x01(\x0e2\x17.proto.ControlEventTypeR\fcontrolEvent\x12@\n" +
-	"\x0fcontrol_context\x18\x03 \x01(\v2\x17.google.protobuf.StructR\x0econtrolContext\"W\n" +
+	"\rcontrol_event\x18\x02 \x01(\x0e2\x17.proto.ControlEventTypeR\fcontrolEvent\x12'\n" +
+	"\x0fcontrol_context\x18\x03 \x01(\fR\x0econtrolContext\"W\n" +
 	"\n" +
 	"VMResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12/\n" +
@@ -241,15 +241,14 @@ var file_proto_vmmanager_proto_goTypes = []any{
 }
 var file_proto_vmmanager_proto_depIdxs = []int32{
 	0, // 0: proto.VMRequest.control_event:type_name -> proto.ControlEventType
-	3, // 1: proto.VMRequest.control_context:type_name -> google.protobuf.Struct
-	3, // 2: proto.VMResponse.result:type_name -> google.protobuf.Struct
-	1, // 3: proto.VMManager.HandleControlEvents:input_type -> proto.VMRequest
-	2, // 4: proto.VMManager.HandleControlEvents:output_type -> proto.VMResponse
-	4, // [4:5] is the sub-list for method output_type
-	3, // [3:4] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	3, // 1: proto.VMResponse.result:type_name -> google.protobuf.Struct
+	1, // 2: proto.VMManager.HandleControlEvents:input_type -> proto.VMRequest
+	2, // 3: proto.VMManager.HandleControlEvents:output_type -> proto.VMResponse
+	3, // [3:4] is the sub-list for method output_type
+	2, // [2:3] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_proto_vmmanager_proto_init() }

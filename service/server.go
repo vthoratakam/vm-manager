@@ -23,11 +23,11 @@ func NewVMManagerServer(mgr *vmmanager.VMManager) *VMManagerServer {
 func (s *VMManagerServer) HandleControlEvents(ctx context.Context, req *proto.VMRequest) (*proto.VMResponse, error) {
 	vmID := req.GetVmId()
 	event := req.GetControlEvent()
-	contextMap := req.GetControlContext().AsMap()
+	context := req.GetControlContext()
 
 	log.Printf("[VM %s] Received control event: %s", vmID, event.String())
 
 	// Call core logic in your manager with enum
-	return s.vmmanager.HandleEvent(vmID, event, contextMap)
+	return s.vmmanager.HandleEvent(vmID, event, context)
 
 }

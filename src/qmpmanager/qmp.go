@@ -221,7 +221,7 @@ func (m *QMPManager) SendQMPCommand(vmID string, cmd map[string]interface{}) (in
 		return nil, fmt.Errorf("write failed: %w", err)
 	}
 
-	log.Printf("[VM %s] Sent QMP command: %s", vmID, cmd["execute"])
+	//log.Printf("[VM %s] Sent QMP command: %s", vmID, cmd["execute"])
 
 	ctx, cancel := context.WithTimeout(m.ctx, commandTimeout)
 	defer cancel()
@@ -229,7 +229,7 @@ func (m *QMPManager) SendQMPCommand(vmID string, cmd map[string]interface{}) (in
 	select {
 	case resp := <-ch:
 
-		log.Printf("[VM %s] QMP response: %+v", vmID, resp)
+		//log.Printf("[VM %s] QMP response: %+v", vmID, resp)
 
 		if errInfo, ok := resp["error"].(map[string]interface{}); ok {
 			return nil, fmt.Errorf("%v: %v", errInfo["class"], errInfo["desc"])
@@ -303,7 +303,7 @@ func (m *QMPManager) handleEvent(fd int, events uint32) {
 		return
 	}
 
-	log.Printf("[VM %s] QMP response: %+v", vmID, msg)
+	//log.Printf("[VM %s] QMP response: %+v", vmID, msg)
 	m.dispatchRawMessage(vmID, msg)
 }
 
