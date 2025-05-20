@@ -17,7 +17,7 @@ func (v *VMManager) CreateVM(vmID string) error {
 	// Create
 	newVM := &VMInstance{}
 	v.vmList[vmID] = newVM
-	v.vmList[vmID].State = StateRunning
+	v.vmList[vmID].State = StateStopped
 	v.vmList[vmID].qmpState = QMPState(QMPDisconnected)
 
 	return nil

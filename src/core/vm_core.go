@@ -120,7 +120,6 @@ func (v *VMManager) HandleEvent(vmID string, event grpcapi.ControlEventType, con
 		return buildErrorResponse(err)
 	}
 
-	// Extract and normalize "return" field
 	resultVal, ok := rawResult["return"]
 	if !ok {
 		return buildErrorResponse(fmt.Errorf("missing 'return' in result"))
