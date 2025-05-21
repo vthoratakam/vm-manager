@@ -8,6 +8,8 @@ import (
 
 // CreateVM Create a VM instance from the manager
 func (v *VMManager) CreateVM(vmID string) error {
+
+	log.Printf("VM %s Create", vmID)
 	_, exists := v.vmList[vmID]
 	if exists {
 		// Optionally, check VM state before deciding to start
@@ -15,11 +17,8 @@ func (v *VMManager) CreateVM(vmID string) error {
 		return fmt.Errorf("VM %s already exists", vmID)
 	}
 	// Create
-	newVM := &VMInstance{}
-	v.vmList[vmID] = newVM
-	v.vmList[vmID].State = StateStopped
-	v.vmList[vmID].qmpState = QMPState(QMPDisconnected)
-
+	v.vmList[vmID] = &VMInstance{State: StateStopped, qmpState: QMPDisconnected}
+	log.Printf("VM %s Created", vmID)
 	return nil
 
 }
@@ -44,7 +43,7 @@ func (v *VMManager) StartVM(vmID string) error {
 
 	vm.State = StateRespawn
 
-	// Wait for QEMU process to be detected
+	//Wait for QEMU process to be detected
 	for {
 		if isQemuRunning(vmID) {
 			break

@@ -25,15 +25,9 @@ func isQemuRunning(vmID string) bool {
 		return false
 	}
 
-	// TODO: Call QMP to check status (e.g. "query-status")
-	// If running/paused/inmigrate → return 1
-	// If shutdown → return 0
-	// If unknown → return 0
-
 	return true
 }
 
-// Retry QMP attach with backoff
 func (v *VMManager) attachToQMPWithRetry(vmID string, maxRetries int, baseDelay time.Duration) error {
 
 	var err error
@@ -71,21 +65,12 @@ func (v *VMManager) OnQMPEvent(vmID string, event string, data map[string]interf
 
 }
 
-// SendQMPCommand wraps the QMP command send for a VM.
 func (v *VMManager) SendQMPCommand(vmID string, context map[string]interface{}) (map[string]interface{}, error) {
-	// Optional tracing/logging
-	start := time.Now()
 
-	// Check if VM exists
-	vm, exists := v.vmList[vmID]
-	if !exists {
-		log.Printf("[VM %s] Not found in VM list", vmID)
-		return nil, fmt.Errorf("VM not found")
-	}
+	vm := v.vmList[vmID]
 
 	// Check if QMP is connected
 	if vm.qmpState != QMPConnected {
-		log.Printf("[VM %s] QMP is not connected. Cannot execute command.", vmID)
 		return nil, fmt.Errorf("QMP not connected for VM %s", vmID)
 	}
 
@@ -97,10 +82,5 @@ func (v *VMManager) SendQMPCommand(vmID string, context map[string]interface{}) 
 		return nil, err
 	}
 
-	// Log the command duration
-	duration := time.Since(start)
-	log.Printf("[VM %s] QMP command succeeded in %s", vmID, duration)
-
-	// Convert the response based on its type
 	return resp.(map[string]interface{}), nil
 }

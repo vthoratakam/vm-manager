@@ -3,7 +3,7 @@ syntax = "proto3";
 package proto;
 option go_package = "vmmanager/proto;proto";
 
-import "google/protobuf/struct.proto";
+//import "google/protobuf/struct.proto";
 
 service VMManager {
   rpc HandleControlEvents(VMRequest) returns (VMResponse);
@@ -27,5 +27,5 @@ message VMRequest {
 
 message VMResponse {
   bool success = 1;
-  google.protobuf.Struct result = 2; // Optional additional info
+  bytes result = 2; // Optional additional info
 }

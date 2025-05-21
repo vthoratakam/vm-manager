@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
@@ -59,12 +58,14 @@ func cleanupSocket(socketPath string) {
 
 func main() {
 	// Start pprof server in the background
-	go func() {
-		log.Println("pprof server listening on http://10.51.0.19:6060")
-		if err := http.ListenAndServe("10.51.0.19:6060", nil); err != nil {
-			log.Printf("pprof server failed: %v", err)
-		}
-	}()
+	/*
+		go func() {
+			log.Println("pprof server listening on http://10.51.0.19:6060")
+			if err := http.ListenAndServe("10.51.0.19:6060", nil); err != nil {
+				log.Printf("pprof server failed: %v", err)
+			}
+		}()
+	*/
 
 	// Set up signal handling for graceful shutdown
 	sigs := make(chan os.Signal, 1)

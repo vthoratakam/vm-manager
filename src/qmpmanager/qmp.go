@@ -107,7 +107,7 @@ func (m *QMPManager) AddVM(vmID string) error {
 		fd, err := m.connectVM(vmID)
 		if err == nil {
 			if err := m.registerVM(vmID, fd); err == nil {
-				log.Printf("[QMP] VM %s connected (fd=%d, attempt=%d)", vmID, fd, attempt+1)
+				log.Printf("[QMP %s] connected (fd=%d, attempt=%d)", vmID, fd, attempt+1)
 				return nil
 			}
 			syscall.Close(fd)
@@ -187,7 +187,7 @@ func (m *QMPManager) RemoveVM(vmID string) {
 func (m *QMPManager) removeVMUnlocked(vmID string) {
 	fd, ok := m.vmToFD[vmID]
 	if !ok {
-		log.Printf("[QMP] RemoveVM: VM %s not found", vmID)
+		log.Printf("[QMP %s] RemoveVM: not found", vmID)
 		return
 	}
 	delete(m.vmToFD, vmID)
@@ -195,7 +195,7 @@ func (m *QMPManager) removeVMUnlocked(vmID string) {
 
 	syscall.EpollCtl(m.epfd, syscall.EPOLL_CTL_DEL, fd, nil)
 	syscall.Close(fd)
-	log.Printf("[QMP] VM %s removed and socket closed", vmID)
+	log.Printf("[QMP %s] removed and socket closed", vmID)
 }
 
 func (m *QMPManager) SendQMPCommand(vmID string, cmd map[string]interface{}) (interface{}, error) {
@@ -221,20 +221,17 @@ func (m *QMPManager) SendQMPCommand(vmID string, cmd map[string]interface{}) (in
 		return nil, fmt.Errorf("write failed: %w", err)
 	}
 
-	//log.Printf("[VM %s] Sent QMP command: %s", vmID, cmd["execute"])
-
 	ctx, cancel := context.WithTimeout(m.ctx, commandTimeout)
 	defer cancel()
 
 	select {
 	case resp := <-ch:
 
-		//log.Printf("[VM %s] QMP response: %+v", vmID, resp)
-
 		if errInfo, ok := resp["error"].(map[string]interface{}); ok {
 			return nil, fmt.Errorf("%v: %v", errInfo["class"], errInfo["desc"])
 		}
 		if _, ok := resp["return"]; ok {
+			delete(resp, "id")
 			return resp, nil
 		}
 		return nil, fmt.Errorf("invalid response format: missing 'return'")
@@ -252,7 +249,12 @@ func (m *QMPManager) eventLoop() {
 		case <-m.ctx.Done():
 			return
 		default:
-			n, err := syscall.EpollWait(m.epfd, m.events[:], 1000)
+			n, err := syscall.EpollWait(m.epfd, m.events[:], -1)
+
+			if err == syscall.EINTR {
+				continue // retry on EINTR
+			}
+
 			if err != nil {
 				log.Printf("[QMP] epoll_wait error: %v", err)
 				continue
@@ -275,7 +277,7 @@ func (m *QMPManager) handleEvent(fd int, events uint32) {
 	}
 
 	if events&(syscall.EPOLLERR|syscall.EPOLLHUP) != 0 {
-		log.Printf("[QMP] EPOLLERR | EPOLLHUP on VM %s (fd=%d)", vmID, fd)
+		log.Printf("[QMP %s] EPOLLERR | EPOLLHUP (fd=%d)", vmID, fd)
 		m.RemoveVM(vmID)
 		if m.handler != nil {
 			go m.handler.OnQMPEvent(vmID, "QMP_SOCKET_CLOSED", nil)
@@ -289,7 +291,7 @@ func (m *QMPManager) handleEvent(fd int, events uint32) {
 
 	n, err := syscall.Read(fd, buf)
 	if err != nil || n <= 0 {
-		log.Printf("[QMP] read error or socket closed on VM %s: %v", vmID, err)
+		log.Printf("[QMP %s] read error or socket closed on %v", vmID, err)
 		m.RemoveVM(vmID)
 		if m.handler != nil {
 			go m.handler.OnQMPEvent(vmID, "QMP_SOCKET_CLOSED", nil)
@@ -299,11 +301,10 @@ func (m *QMPManager) handleEvent(fd int, events uint32) {
 
 	var msg map[string]interface{}
 	if err := json.Unmarshal(buf[:n], &msg); err != nil {
-		log.Printf("[QMP] invalid JSON from VM %s: %v", vmID, err)
+		log.Printf("[QMP %s] invalid JSON %s", vmID, err)
 		return
 	}
 
-	//log.Printf("[VM %s] QMP response: %+v", vmID, msg)
 	m.dispatchRawMessage(vmID, msg)
 }
 
@@ -315,7 +316,7 @@ func (m *QMPManager) dispatchRawMessage(vmID string, msg map[string]interface{})
 			select {
 			case ch <- msg:
 			default:
-				log.Printf("[QMP] response channel for command %s is full", id)
+				log.Printf("[QMP %s] response channel for command %s is full", vmID, id)
 			}
 			delete(m.qmpcmdResponses, id)
 		}

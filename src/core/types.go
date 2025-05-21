@@ -1,9 +1,7 @@
 package vmmanager
 
-import "sync"
-
 type VMInstance struct {
-	vmMutex        sync.Mutex
+	//vmMutex        sync.Mutex
 	State          VMState // running, stopped, paused, respawn
 	qmpState       QMPState
 	reconcileEvent ReconcileEvent
